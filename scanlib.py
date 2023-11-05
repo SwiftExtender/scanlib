@@ -105,7 +105,7 @@ def stdin_data_handle(proc, stdin_data, lower_flag):
             res = str(proc.communicate()[0]).splitlines()
     return res
 
-def execute_worker(all_results: dict, command: str, category: str, lower_flag=True, stdin_data = [], stdout_file='', output_type='list', no_stdout = False, wait=True, logging=True):
+def execute_worker(all_results: dict, command: str, category: str, lower_flag=True, stdin_data = [], stdout_file='', output_type='list', no_stdout = False, wait=True, logging=True, timeout=0):
     if no_stdout:
         proc = subprocess.Popen(command, stdin=subprocess.PIPE,
                                 stdout=subprocess.DEVNULL)
@@ -136,12 +136,18 @@ def execute_worker(all_results: dict, command: str, category: str, lower_flag=Tr
     else:
         return res
 
-def execute_pipe_worker(all_results: dict, command: str, category: str, exact_time, stdin_data, stdout_file, no_last_line=True) -> list[str]:
+def execute_pipe_worker(all_results: dict, command: str, category: str, exact_time, stdin_data='', stdout_file='', no_last_line=True) -> list[str]:
     try:
-        if exact_time == 0:
-            res = subprocess.run(command, capture_output=True, text=True, input=stdin_data)
+        if stdin_data == '':
+            if exact_time == 0:
+                res = subprocess.run(command, capture_output=True)
+            else:
+                res = subprocess.run(command, timeout=exact_time, capture_output=True)
         else:
-            res = subprocess.run(command, timeout=exact_time, capture_output=True, text=True, input=stdin_data)
+            if exact_time == 0:
+                res = subprocess.run(command, capture_output=True, text=True, input=stdin_data)
+            else:
+                res = subprocess.run(command, timeout=exact_time, capture_output=True, text=True, input=stdin_data)
         #print(res)
         res = res.stdout.splitlines()
         log_worker(all_results, res, category)
@@ -149,8 +155,9 @@ def execute_pipe_worker(all_results: dict, command: str, category: str, exact_ti
     except subprocess.TimeoutExpired as e:
         res = e.stdout.splitlines()
         log_worker(all_results, res, category)
-        with open(stdout_file, 'w') as f:
-            f.writelines(res)
+        if stdout_file != '':
+            with open(stdout_file, 'w') as f:
+                f.writelines(res)
         if no_last_line:
             return res[:-1]
         else:
@@ -312,18 +319,18 @@ def web_init_recon(all_results: dict, scheme: str, hosts: list, proxy=False):
                     #print('important_urls')
                     #print(important_urls)
 
-def web_recon(all_results: dict, scheme: str, dns: str, port: str, proxy=False):
-    urls = web_discovering(all_results, scheme, dns, port, proxy)
+def web_recon(all_results: dict, scheme: str, host: str, port: str, proxy=False):
+    urls = web_discovering(all_results, scheme, host, port, proxy)
     print('urls')
     print(len(urls))
     #print(urls[:5])
 
-    with open(foldername[0] + os.sep + 'url_results' + os.sep + scheme + '-' + dns + '-' + port + '.txt', 'w') as f:
+    with open(foldername[0] + os.sep + 'url_results' + os.sep + scheme + '-' + host + '-' + port + '.txt', 'w') as f:
         f.writelines(line+'\n' for line in urls)
-    headless_recon(all_results, )
+    headless_recon(all_results, scheme, host, port, proxy)
+    web_intrude(all_results, scheme, host, port, proxy)
     #unfurled = unfurl_urls(all_results, urls, scheme, dns, port)
     #target_urls, param_list = unfurl_urls(all_results, urls)
-    #web_intrude(all_results, urls)
     #web_fuzz(all_results, urls)
 
 def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1=False) -> list:
@@ -342,14 +349,11 @@ def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1
     else:
         execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 200,204,301,302,307,401,403,405,500,501,502 -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
-        hakrawler_res = execute_pipe_worker(all_results, 'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\" --proxy {1}'.format(user_agent, proxy), 'hakrawler', 5, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
-    #print('hakrawler_res')
-    #print(hakrawler_res)
+        hakrawler_res = execute_pipe_worker(all_results, 'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\" --proxy {1}'.format(user_agent, proxy), 'hakrawler', 120, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
+
     #cariddi_file = foldername[0] + os.sep + 'cariddi_results' + os.sep + addr + '-' + port + '.txt'
     #execute_worker(all_results, 'cariddi -e -err -ext 1 -intensive -s -info -ua \"{0}\"'.format(user_agent), 'cariddi', stdin_data=hakrawler_file, stdout_file=cariddi_file)
     hakrawler_urls = get_column(hakrawler_res, 1)
-    #print('hakrawler_urls')
-    #print(hakrawler_urls)
     urls.extend(ffuf_urls)
     urls.extend(hakrawler_urls)
 
@@ -362,22 +366,22 @@ def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1
     #log_intermediate(uniq_urls)
     return urls
 
-def headless_recon(all_results: dict, scheme: str, addr: str, port: str, proxy=False):
-    katana_file_direnum = foldername[0] + os.sep + 'katana_results' + os.sep + addr + '-' + port + '.txt'
+def headless_recon(all_results: dict, scheme: str, host: str, port: str, proxy=False):
+    katana_file_direnum = foldername[0] + os.sep + 'katana_results' + os.sep + host + '-' + port + '.txt'
     if proxy:
-        execute_worker(all_results, "katana -jc -aff -fx -iqp -hl -xhr -silent -d 4 -u {0}://{1}:{2} -proxy {3} -o {4}".format(scheme, addr, port, proxy, katana_file_direnum))
+        execute_pipe_worker(all_results, "katana -jc -aff -fx -iqp -hl -xhr -silent -d 4 -u {0}://{1}:{2} -proxy {3} -o {4}".format(scheme, host, port, proxy, katana_file_direnum), "katana", 480)
     else:
-        execute_worker(all_results, "katana -jc -aff -fx -iqp -hl -xhr -silent -d 4 -u {0}://{1}:{2} -o {3}".format(scheme, addr, port, katana_file_direnum))
+        execute_pipe_worker(all_results, "katana -jc -aff -fx -iqp -hl -xhr -silent -d 4 -u {0}://{1}:{2} -o {3}".format(scheme, host, port, katana_file_direnum), "katana", 480)
 
 #def declutter_urls(all_results, urls):
 #    return execute_pipe_worker(all_results, 'godeclutter', 'godeclutter', 1200, """{}""".format('\n'.join(urls)), foldername[0] + os.sep + 'urls_'+gen_timestamp()+'.txt', False)
 
-def web_intrude(all_results: dict, scheme: str, addr: str, port: str, proxy=False):
-    dalfox_file_direnum = foldername[0] + os.sep + 'dalfox_results' + os.sep + addr + '-' + port + '.txt'
+def web_intrude(all_results: dict, scheme: str, host: str, port: str, proxy=False):
+    dalfox_file_direnum = foldername[0] + os.sep + 'dalfox_results' + os.sep + host + '-' + port + '.txt'
     if proxy:
-        execute_worker(all_results, 'dalfox file ')
+        execute_worker(all_results, 'dalfox file --deep-domxss {0}://{1}:{2} -proxy {3} -o {4}'.format(scheme, host, port, proxy, dalfox_file_direnum), 'dalfox')
     else:
-        execute_worker(all_results, 'dalfox file ')
+        execute_worker(all_results, 'dalfox file --deep-domxss {0}://{1}:{2} -o {3}'.format(scheme, host, port, proxy, dalfox_file_direnum), 'dalfox')
 
-def web_fuzz(all_resuls: dict):
-    execute_worker(all_resuls, '', '')
+#def web_fuzz(all_resuls: dict):
+#    execute_worker(all_resuls, '', '')
