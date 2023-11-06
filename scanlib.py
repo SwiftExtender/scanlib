@@ -340,14 +340,14 @@ def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1
     hakrawler_file = foldername[0] + os.sep + 'hakrawler_results' + os.sep + addr + '-' + port + '.txt'
     if proxy == False:
         execute_worker(all_results,
-                       'ffuf -H \"' + user_agent + '\" -u ' + scheme + '://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 200,204,301,302,307,401,403,405,500,501,502 -of csv -o ' + ffuf_file_direnum,
+                       'ffuf -H \"' + user_agent + '\" -u ' + scheme + '://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -of csv -o ' + ffuf_file_direnum,
                        'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
         hakrawler_res = execute_pipe_worker(all_results,
                                             'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\"'.format(user_agent),
                                             'hakrawler', 5, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
     else:
-        execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 200,204,301,302,307,401,403,405,500,501,502 -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
+        execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
         hakrawler_res = execute_pipe_worker(all_results, 'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\" --proxy {1}'.format(user_agent, proxy), 'hakrawler', 120, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
 
@@ -379,9 +379,9 @@ def headless_recon(all_results: dict, scheme: str, host: str, port: str, proxy=F
 def web_intrude(all_results: dict, scheme: str, host: str, port: str, proxy=False):
     dalfox_file_direnum = foldername[0] + os.sep + 'dalfox_results' + os.sep + host + '-' + port + '.txt'
     if proxy:
-        execute_worker(all_results, 'dalfox file --deep-domxss {0}://{1}:{2} -proxy {3} -o {4}'.format(scheme, host, port, proxy, dalfox_file_direnum), 'dalfox')
+        execute_worker(all_results, 'dalfox file -b --deep-domxss {0}://{1}:{2} -proxy {3} -o {4}'.format(scheme, host, port, proxy, dalfox_file_direnum), 'dalfox')
     else:
-        execute_worker(all_results, 'dalfox file --deep-domxss {0}://{1}:{2} -o {3}'.format(scheme, host, port, proxy, dalfox_file_direnum), 'dalfox')
+        execute_worker(all_results, 'dalfox file -b --deep-domxss {0}://{1}:{2} -o {3}'.format(scheme, host, port, proxy, dalfox_file_direnum), 'dalfox')
 
 #def web_fuzz(all_resuls: dict):
 #    execute_worker(all_resuls, '', '')
