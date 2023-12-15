@@ -4,12 +4,21 @@ from scanlib import *
 parser = argparse.ArgumentParser()
 parser.add_argument("--domain", help="Domain to scan")
 parser.add_argument("--proxy", help="Proxy to store requests")
+parser.add_argument("--dnsonly", help="No ip webscan", action='store_true')
+parser.add_argument("--nod", help="No discovering")
+parser.add_argument("--noe", help="No entering sites")
 
 args = parser.parse_args()
-
+exec_args = []
 domain = args.domain
+proxy = args.proxy
+nod = args.nod
+noe = args.noe
+dnsonly = args.dnsonly
 
 all_results = {}
+
+#os._exit(0)
 print(create_artifacts(domain))
 execute_worker(all_results, 'subfinder -d {0} -silent'.format(domain), 'subfinder')
 execute_worker(all_results, 'dnsx -silent -resp -d {0} -w !assets\\5000.txt'.format(domain), 'dnsx')
@@ -65,13 +74,19 @@ log_intermediate(non_http_ports)
 all_results['DNS_IP'] = links_ip_to_dns(all_results['DNS_IP'])
 
 if args.proxy != None:
-    web_init_recon(all_results, 'https', https_ports, args.proxy)
-    web_init_recon(all_results, 'http', http_ports, args.proxy)
+    web_init_recon(all_results, 'https', https_ports, dns_only=dnsonly, proxy=proxy)
+    web_init_recon(all_results, 'http', http_ports, dns_only=dnsonly, proxy=proxy)
 else:
-    web_init_recon(all_results, 'https', https_ports)
-    web_init_recon(all_results, 'http', http_ports)
+    web_init_recon(all_results, 'https', https_ports, dns_only=dnsonly, proxy=proxy)
+    web_init_recon(all_results, 'http', http_ports, dns_only=dnsonly, proxy=proxy)
+
 inner_urls, outer_urls = web_extracting(all_results)
-print(all_results)
+print('inner_urls')
+print(inner_urls)
+print('outer_urls')
+print(outer_urls)
+log_intermediate(all_results)
+#print(all_results)
 
 #for service in service_further_scan_list:
 #    execute_worker('ffuf -mc all -w 5000.txt -H "Host: FUZZ.fultek.com.tr" -u https://fultek.com.tr -o usual.txt','vhost_dns')
