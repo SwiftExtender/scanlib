@@ -208,7 +208,7 @@ def nmap_services_scan(all_results: dict, host_and_ports: list) -> list:
                 ports_list += str(v[i]) + ','
             else:
                 ports_list += str(v[i])
-        timestamp = foldername[0] + os.sep + 'nmap_results' + os.sep + datetime.now().strftime('%d-%m-%Y-%H%M%S') + '.txt'
+        timestamp = foldername[0] + os.sep + 'nmap_results' + os.sep + k + '_' + datetime.now().strftime('%d-%m-%Y-%H%M%S') + '.txt'
         command = 'nmap -oX ' + timestamp + ' -sV -n -Pn -p' + ports_list + ' --max-parallelism 900 --unprivileged ' + k
         execute_worker(all_results, command, 'RANDOM', no_stdout=True, logging=False)
         #print(command)
@@ -219,7 +219,7 @@ def scan_list_converting(input: list) -> (list, list):
     cpe_list = []
     service_further_scan_list = []
     for service in input:
-        ip, port, transport, opened_status, protocol, product, tunnel = service.split(',')
+        ip, port, transport, opened_status, protocol, product, tunnel = service.split('\t')
         cpe_list.append((ip, port, product))
         service_further_scan_list.append((ip, port, protocol, tunnel))
     return cpe_list, service_further_scan_list
@@ -235,8 +235,8 @@ def nmap_results_for_cve_list(nmap_xmls: list) -> list:
             for s in h.services:
                 print(s)
                 if s.state != "open|filtered":
-                    services.append(str(h.ipv4) + "," + str(s.port) + "," + str(s.protocol) + "," + str(s.state) + "," + str(
-                    s.service) + "," + str(s.banner)+ "," + str(s.tunnel))
+                    services.append(str(h.ipv4) + "\t" + str(s.port) + "\t" + str(s.protocol) + "\t" + str(s.state) + "\t" + str(
+                    s.service) + "\t" + str(s.banner)+ "\t" + str(s.tunnel))
     return services
 
 def parse_to_cpe(services_list: list) -> list:
@@ -340,14 +340,14 @@ def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1
     hakrawler_file = foldername[0] + os.sep + 'hakrawler_results' + os.sep + addr + '-' + port + '.txt'
     if proxy == False:
         execute_worker(all_results,
-                       'ffuf -H \"' + user_agent + '\" -u ' + scheme + '://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -of csv -o ' + ffuf_file_direnum,
+                       'ffuf -H \"' + user_agent + '\" -u ' + scheme + '://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -sf -of csv -o ' + ffuf_file_direnum,
                        'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
         hakrawler_res = execute_pipe_worker(all_results,
                                             'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\"'.format(user_agent),
                                             'hakrawler', 5, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
     else:
-        execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
+        execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -sf -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
         hakrawler_res = execute_pipe_worker(all_results, 'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\" --proxy {1}'.format(user_agent, proxy), 'hakrawler', 120, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
 
