@@ -1,5 +1,4 @@
 import os
-import socket
 import subprocess
 import csv
 from datetime import datetime
@@ -47,7 +46,7 @@ def create_artifacts(domain):
         create_folder_in_scan_folder('dalfox_results')
         create_folder_in_scan_folder('url_results')
         create_folder_in_scan_folder('url_prep_results')
-
+        create_folder_in_scan_folder('httpx_screens')
         #create_folder_in_scan_folder('cariddi_results')
         return foldername[0]
     except Exception as e:
@@ -116,21 +115,15 @@ def execute_worker(all_results: dict, command: str, category: str, lower_flag=Tr
             print(proc.returncode)
         return True #ignore stdout operations, fix later
     else:
-        #print(os.getcwd())
-
         proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         print(command)
-        #html_logger.warn(command)
         res = stdin_data_handle(proc, stdin_data, lower_flag)
         if stdout_file != '':
             f = open(stdout_file, 'w')
             f.writelines(res)
             f.close()
-    #unique_res = list()
     if logging:
         log_worker(all_results, res, category)
-        #print(type(res))
-        #print(res)
     if output_type == 'str':
         return str(res)
     else:
@@ -164,14 +157,11 @@ def execute_pipe_worker(all_results: dict, command: str, category: str, exact_ti
             return res
 
 def get_column(text, number=0) -> list:
-    #print('!!!!!!!!!!!!!!!!!!!!!')
     ret = []
     if isinstance(text, str):
         for line in text:
-            #print(line)
             ret.append(line.split()[number])
     elif isinstance(text, list):
-        #print('##')
         for item in text:
             ret.append(str(item).split()[number])
     else:
@@ -224,7 +214,6 @@ def scan_list_converting(input: list) -> (list, list):
         service_further_scan_list.append((ip, port, protocol, tunnel))
     return cpe_list, service_further_scan_list
 
-
 def nmap_results_for_cve_list(nmap_xmls: list) -> list:
     services = []
     for resfile in nmap_xmls:
@@ -275,9 +264,6 @@ def extract_from_urls():
 #     site_all_dynamic_urls = []
 #     return []
 
-#def
-#    foldername[0] + os.sep + 'ffuf_results' + os.sep + addr + '-' + port + '.csv'
-
 def web_extracting(all_results: dict) -> (list, list):
     url_files_folder = foldername[0] + os.sep + 'url_results'
     url_prep_files_folder = foldername[0] + os.sep + 'url_prep_results'
@@ -285,6 +271,7 @@ def web_extracting(all_results: dict) -> (list, list):
     site_inner_urls_all = []
     site_outer_urls_all = []
     for f in url_files:
+        print(f[:-4].split('-'))
         scheme, host, port = f[:-4].split('-')
         site_all_urls_file = open(url_files_folder + os.sep + f, 'r')
         site_all_urls = site_all_urls_file.readlines()
@@ -293,8 +280,6 @@ def web_extracting(all_results: dict) -> (list, list):
                                              'grep -oE \"(http|https)://(.*){0}(.*)\" {1}'.format(host, url_files_folder + os.sep + f), f)
         site_outer_urls_all.extend([i for i in site_all_urls if i not in site_inner_urls])
         site_inner_urls_all.extend(site_inner_urls)
-        #print(site_inner_urls)
-        #print("-"*50)
     print(site_inner_urls_all)
     site_inner_urls_all.extend(filter_list(target_domain[0], site_outer_urls_all))
     site_inner_urls_all = uniq_and_sort(site_inner_urls_all)
@@ -303,35 +288,50 @@ def web_extracting(all_results: dict) -> (list, list):
     write_to_file(url_prep_files_folder, 'outer_urls.txt', site_outer_urls_all)
     return site_inner_urls_all, site_outer_urls_all
 
-def web_init_recon(all_results: dict, scheme: str, hosts: list, proxy=False):
+def web_init_recon(all_results: dict, scheme: str, hosts: list, dns_only=False, proxy=False):
     already_scanned = []
-    for host in hosts:
-        if host not in already_scanned:
-            web_recon(all_results, scheme, host[0], host[1], proxy)
-            #web_discovering(all_results, scheme, host[0], host[1])
-            already_scanned.append(host)
+    if dns_only:
+        for host in hosts:
             for dns in all_results['DNS_IP'][host[0]]:
                 if (dns, host[1]) not in already_scanned:
-                    #urls = web_discovering(all_results, scheme, dns, host[1])
                     web_recon(all_results, scheme, dns, host[1], proxy)
                     already_scanned.append((dns, host[1]))
-                    #important_urls = declutter_urls(all_results, urls)
-                    #print('important_urls')
-                    #print(important_urls)
+    else:
+        for host in hosts:
+            if host not in already_scanned:
+                print('if host not in already_scanned')
+                print(host[0])
+                web_recon(all_results, scheme, host[0], host[1], proxy)
+                already_scanned.append(host)
+                for dns in all_results['DNS_IP'][host[0]]:
+                    if (dns, host[1]) not in already_scanned:
+                        print('if (dns, host[1]) not in already_scanned:')
+                        print(dns)
+                        web_recon(all_results, scheme, dns, host[1], proxy)
+                        already_scanned.append((dns, host[1]))
 
 def web_recon(all_results: dict, scheme: str, host: str, port: str, proxy=False):
+    print(web_entering(all_results, scheme, host, port, proxy))
     urls = web_discovering(all_results, scheme, host, port, proxy)
     print('urls')
     print(len(urls))
-    #print(urls[:5])
 
     with open(foldername[0] + os.sep + 'url_results' + os.sep + scheme + '-' + host + '-' + port + '.txt', 'w') as f:
         f.writelines(line+'\n' for line in urls)
-    headless_recon(all_results, scheme, host, port, proxy)
-    web_intrude(all_results, scheme, host, port, proxy)
+    #headless_recon(all_results, scheme, host, port, proxy)
+    #web_intrude(all_results, scheme, host, port, proxy)
     #unfurled = unfurl_urls(all_results, urls, scheme, dns, port)
     #target_urls, param_list = unfurl_urls(all_results, urls)
     #web_fuzz(all_results, urls)
+
+def web_entering(all_results: dict, scheme: str, host: str, port: str, proxy=False):
+    httpx_dir = foldername[0] + os.sep + 'httpx_screens' + os.sep + host + '-' + port
+    if proxy:
+        execute_worker(all_results, 'httpx -sc -title -server -screenshot -tls-probe -csp-probe -u {0}://{1}:{2} -http-proxy {3} -srd {4}'.format(scheme, host, port, proxy, httpx_dir), 'httpx')
+    else:
+        execute_worker(all_results,
+            'httpx -sc -title -server -screenshot -tls-probe -csp-probe -u {0}://{1}:{2} -srd {3}'.format(
+                scheme, host, port, httpx_dir), 'httpx')
 
 def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1=False) -> list:
     proxy=False
