@@ -5,6 +5,7 @@ from datetime import datetime
 from collections import defaultdict
 from libnmap.parser import NmapParser
 import html_logger
+import inspect
 
 target_domain = ['']
 foldername = ['']
@@ -130,16 +131,24 @@ def execute_worker(all_results: dict, command: str, category: str, lower_flag=Tr
         return res
 
 def execute_pipe_worker(all_results: dict, command: str, category: str, exact_time, stdin_data='', stdout_file='', no_last_line=True) -> list[str]:
+    saved_args = {**locals()}  # Capture all local variables
+    print("saved_args is", saved_args)
+    log_worker(all_results, saved_args, category)
     try:
         if stdin_data == '':
             if exact_time == 0:
+                print('firest')
                 res = subprocess.run(command, capture_output=True)
             else:
+                print('second')
+                
                 res = subprocess.run(command, timeout=exact_time, capture_output=True)
         else:
             if exact_time == 0:
+                print('third')
                 res = subprocess.run(command, capture_output=True, text=True, input=stdin_data)
             else:
+                print('forth')
                 res = subprocess.run(command, timeout=exact_time, capture_output=True, text=True, input=stdin_data)
         #print(res)
         res = res.stdout.splitlines()
@@ -340,14 +349,16 @@ def web_discovering(all_results: dict, scheme: str, addr: str, port: str, proxy1
     hakrawler_file = foldername[0] + os.sep + 'hakrawler_results' + os.sep + addr + '-' + port + '.txt'
     if proxy == False:
         execute_worker(all_results,
-                       'ffuf -H \"' + user_agent + '\" -u ' + scheme + '://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -sf -of csv -o ' + ffuf_file_direnum,
+                       'ffuf -H \"' + user_agent + '\" -u ' + scheme + '://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502,503,504 -sf -of csv -o ' + ffuf_file_direnum,
                        'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
+        print('ffuf_urls')
+        print(ffuf_urls)
         hakrawler_res = execute_pipe_worker(all_results,
                                             'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\"'.format(user_agent),
-                                            'hakrawler', 5, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
+                                            'hakrawler', 300, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
     else:
-        execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502 -sf -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
+        execute_worker(all_results, 'ffuf -H \"'+user_agent+'\" -u '+scheme+'://' + addr + ':' + port + '/FUZZ -w !assets\\wordlist.txt -ac -mc 100,101,102,103,200,201,202,203,204,205,206,207,208,301,302,303,307,401,403,405,406,407,408,409,410,411,417,500,501,502,503,504 -sf -of csv -o '+ffuf_file_direnum+' -x '+proxy, 'ffuf_direnum')
         ffuf_urls = get_csv_column(ffuf_file_direnum, 'url')
         hakrawler_res = execute_pipe_worker(all_results, 'hakrawler -d 3 -subs -s -u -insecure -h \"{0}\" --proxy {1}'.format(user_agent, proxy), 'hakrawler', 120, """{}""".format('\n'.join(ffuf_urls)), hakrawler_file)
 
