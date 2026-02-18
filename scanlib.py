@@ -5,11 +5,21 @@ from datetime import datetime
 from collections import defaultdict
 from libnmap.parser import NmapParser
 import html_logger
-import inspect
 
 target_domain = ['']
 foldername = ['']
 user_agent = 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'
+
+def extract_urls_tuple(data: list) -> list:
+    output_list = []
+    for i in data:
+        output_list.append(str(i[2])+str(i[0])+":"+str(i[1]))
+    return output_list
+
+def save_to_txt_file(fname: str, data: list):
+    with open(os.path.join(foldername[0], fname), 'w') as f:
+        for i in data:
+            print(i, file=f)
 
 def write_to_file(dir: str, filename: str, content: list) -> bool:
     try:
@@ -41,13 +51,13 @@ def create_artifacts(domain):
         os.makedirs(foldername[0])
         html_logger.setup('Scan results', filename=foldername[0] + os.sep + 'results.html', version="0.0.1")
         create_folder_in_scan_folder('nmap_results')
-        create_folder_in_scan_folder('ffuf_results')
-        create_folder_in_scan_folder('hakrawler_results')
-        create_folder_in_scan_folder('katana_results')
-        create_folder_in_scan_folder('dalfox_results')
-        create_folder_in_scan_folder('url_results')
-        create_folder_in_scan_folder('url_prep_results')
-        create_folder_in_scan_folder('httpx_screens')
+        #create_folder_in_scan_folder('ffuf_results')
+        #create_folder_in_scan_folder('hakrawler_results')
+        #create_folder_in_scan_folder('katana_results')
+        #create_folder_in_scan_folder('dalfox_results')
+        #create_folder_in_scan_folder('url_results')
+        #create_folder_in_scan_folder('url_prep_results')
+        #create_folder_in_scan_folder('httpx_screens')
         #create_folder_in_scan_folder('cariddi_results')
         return foldername[0]
     except Exception as e:
@@ -133,7 +143,7 @@ def execute_worker(all_results: dict, command: str, category: str, lower_flag=Tr
 def execute_pipe_worker(all_results: dict, command: str, category: str, exact_time, stdin_data='', stdout_file='', no_last_line=True) -> list[str]:
     saved_args = {**locals()}  # Capture all local variables
     print("saved_args is", saved_args)
-    log_worker(all_results, saved_args, category)
+    log_intermediate(saved_args)
     try:
         if stdin_data == '':
             if exact_time == 0:
@@ -327,8 +337,8 @@ def web_recon(all_results: dict, scheme: str, host: str, port: str, proxy=False)
 
     with open(foldername[0] + os.sep + 'url_results' + os.sep + scheme + '-' + host + '-' + port + '.txt', 'w') as f:
         f.writelines(line+'\n' for line in urls)
-    #headless_recon(all_results, scheme, host, port, proxy)
-    #web_intrude(all_results, scheme, host, port, proxy)
+    headless_recon(all_results, scheme, host, port, proxy)
+    web_intrude(all_results, scheme, host, port, proxy)
     #unfurled = unfurl_urls(all_results, urls, scheme, dns, port)
     #target_urls, param_list = unfurl_urls(all_results, urls)
     #web_fuzz(all_results, urls)
