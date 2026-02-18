@@ -60,19 +60,28 @@ print('Defining port types for further scan')
 for item in service_further_scan_list:
     print(item)
     if item[2] == 'http' and item[3] != 'ssl':
-        http_ports.append((item[0], item[1]))
+        http_ports.append((item[0], item[1],'http://'))
     elif (item[2] == 'https') or (item[2] == 'http' and item[3] == 'ssl'):
-        https_ports.append((item[0], item[1]))
+        https_ports.append((item[0], item[1],'https://'))
     else:
         non_http_ports.append((item[0], item[1]))
 
 print(http_ports)
 print(https_ports)
 print(non_http_ports)
-log_intermediate(http_ports)
-log_intermediate(https_ports)
+log_intermediate('http_urls')
+http_saved_data = extract_urls_tuple(http_ports)
+log_intermediate(http_saved_data)
+save_to_txt_file('http_urls.txt',http_saved_data)
+log_intermediate('https_urls')
+https_saved_data = extract_urls_tuple(https_ports)
+log_intermediate(https_saved_data)
+save_to_txt_file('https_urls.txt',https_saved_data)
+log_intermediate('non_http_ports')
 log_intermediate(non_http_ports)
 all_results['DNS_IP'] = links_ip_to_dns(all_results['DNS_IP'])
+
+
 
 if args.proxy != None:
     web_init_recon(all_results, 'https', https_ports, dns_only=dnsonly, proxy=proxy)
@@ -94,4 +103,3 @@ log_intermediate(all_results)
 #    execute_worker('ffuf -mc all -w vhost_ips.txt -H "Host: FUZZ" -u https://fultek.com.tr -o ','vhost_ips')
 #execute_worker('echo "cpe:/a:apache"| csv2cpe -x -lower -cpe_part=1 -cpe_vendor=2 -cpe_product=3 -cpe_version=4 -cpe_update=5 -cpe_edition=6 -cpe_language=7', stdin_data=list(all_results['DNS']))
 #execute_worker('echo "cpe:/a:apache"| cpe2cve -cpe 1 -e 1 -cve 1  CVEs\\nvdcve-1.1-2002.json.gz', stdin_data=list(all_results['DNS']))
-
